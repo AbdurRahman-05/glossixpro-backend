@@ -27,34 +27,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-// CORS Configuration - Allow frontend domains
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-  process.env.FRONTEND_URL, // Add your production frontend URL in .env
-].filter(Boolean); // Remove undefined values
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, or curl)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      // For development, allow all origins. For production, restrict.
-      if (process.env.NODE_ENV === 'production') {
-        callback(new Error('Not allowed by CORS'));
-      } else {
-        callback(null, true);
-      }
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadsDir));
@@ -465,17 +438,12 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-  connectionTimeout: 10000, // 10 second timeout
-  greetingTimeout: 10000,
 });
 
-// Verify transporter connection (non-blocking)
-// This won't prevent server startup if SMTP is unavailable
+// Verify transporter connection
 transporter.verify(function (error, success) {
   if (error) {
-    console.warn('⚠️  SMTP Connection Warning:', error.message);
-    console.warn('📧 Email functionality may not work. Contact form will fail.');
-    console.warn('💡 This is non-critical - server will continue running.');
+    console.error('❌ SMTP Connection Error:', error);
   } else {
     console.log('✅ SMTP Server is ready to take our messages');
     console.log('📧 SMTP Config:', {
