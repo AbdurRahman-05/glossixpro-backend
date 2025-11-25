@@ -465,12 +465,17 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  connectionTimeout: 10000, // 10 second timeout
+  greetingTimeout: 10000,
 });
 
-// Verify transporter connection
+// Verify transporter connection (non-blocking)
+// This won't prevent server startup if SMTP is unavailable
 transporter.verify(function (error, success) {
   if (error) {
-    console.error('❌ SMTP Connection Error:', error);
+    console.warn('⚠️  SMTP Connection Warning:', error.message);
+    console.warn('📧 Email functionality may not work. Contact form will fail.');
+    console.warn('💡 This is non-critical - server will continue running.');
   } else {
     console.log('✅ SMTP Server is ready to take our messages');
     console.log('📧 SMTP Config:', {
