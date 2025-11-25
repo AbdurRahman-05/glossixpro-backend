@@ -429,36 +429,58 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 
-// Email Transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Email Transporter - Only initialize if SMTP credentials are provided
+let transporter = null;
 
-// Verify transporter connection
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error('❌ SMTP Connection Error:', error);
-  } else {
-    console.log('✅ SMTP Server is ready to take our messages');
-    console.log('📧 SMTP Config:', {
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 587,
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
       user: process.env.SMTP_USER,
-      secure: process.env.SMTP_SECURE
-    });
-  }
-});
+      pass: process.env.SMTP_PASS,
+    },
+    // Add timeout settings to prevent hanging
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  });
+
+  // Verify transporter connection (non-blocking)
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.error('❌ SMTP Connection Error:', error.message);
+      console.warn('⚠️  Email functionality will be disabled. Please check your SMTP credentials.');
+    } else {
+      console.log('✅ SMTP Server is ready to take our messages');
+      console.log('📧 SMTP Config:', {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        secure: process.env.SMTP_SECURE
+      });
+    }
+  });
+} else {
+  console.warn('⚠️  SMTP credentials not configured. Email functionality will be disabled.');
+  console.warn('💡 Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable emails.');
+}
+
 
 // Contact Form Endpoint
 app.post('/api/contact', handleAsync(async (req, res) => {
   try {
     const { name, email, businessName, phoneNumber, howCanWeHelp, bestTimeToContact, message } = req.body;
+
+    // Check if email is configured
+    if (!transporter) {
+      console.warn('⚠️  Email not sent: SMTP not configured');
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'Contact form submission received but email could not be sent. Please contact the administrator.'
+      });
+    }
 
     console.log('Attempting to send email from:', email);
 
@@ -501,6 +523,15 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     if (!resumeFile) {
       return res.status(400).json({ error: 'Resume file is required' });
+    }
+
+    // Check if email is configured
+    if (!transporter) {
+      console.warn('⚠️  Application received but email not sent: SMTP not configured');
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'Application received but email could not be sent. Please contact the administrator.'
+      });
     }
 
     console.log('Attempting to send job application email from:', email);
