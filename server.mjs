@@ -8,11 +8,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import PageContent from './models/PageContent.js';
-import nodemailer from 'nodemailer';
-import dns from 'dns';
-
-// Force IPv4
-dns.setDefaultResultOrder('ipv4first');
+import { Resend } from 'resend';
 
 // Load environment variables
 dotenv.config();
@@ -433,45 +429,15 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 
-// Email Transporter - Only initialize if SMTP credentials are provided
-let transporter = null;
+// Initialize Resend
+let resend = null;
 
-if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT || 465,
-    secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT == 465, // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    // Add timeout settings to prevent hanging
-    connectionTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-    family: 4, // Force IPv4
-    logger: true, // Log to console
-    debug: true, // include SMTP traffic in the logs
-  });
-
-  // Verify transporter connection (non-blocking)
-  transporter.verify(function (error, success) {
-    if (error) {
-      console.error('❌ SMTP Connection Error:', error.message);
-      console.warn('⚠️  Email functionality will be disabled. Please check your SMTP credentials.');
-    } else {
-      console.log('✅ SMTP Server is ready to take our messages');
-      console.log('📧 SMTP Config:', {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_USER,
-        secure: process.env.SMTP_SECURE
-      });
-    }
-  });
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  console.log('✅ Resend email service initialized');
 } else {
-  console.warn('⚠️  SMTP credentials not configured. Email functionality will be disabled.');
-  console.warn('💡 Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable emails.');
+  console.warn('⚠️  RESEND_API_KEY not configured. Email functionality will be disabled.');
+  console.warn('💡 Set RESEND_API_KEY environment variable to enable emails.');
 }
 
 
@@ -481,8 +447,8 @@ app.post('/api/contact', handleAsync(async (req, res) => {
     const { name, email, businessName, phoneNumber, howCanWeHelp, bestTimeToContact, message } = req.body;
 
     // Check if email is configured
-    if (!transporter) {
-      console.warn('⚠️  Email not sent: SMTP not configured');
+    if (!resend) {
+      console.warn('⚠️  Email not sent: Resend not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Contact form submission received but email could not be sent. Please contact the administrator.'
@@ -491,11 +457,11 @@ app.post('/api/contact', handleAsync(async (req, res) => {
 
     console.log('Attempting to send email from:', email);
 
-    const mailOptions = {
-      from: `"${name}" <${process.env.SMTP_USER}>`, // sender address
-      replyTo: email,
-      to: process.env.ADMIN_EMAIL, // list of receivers
-      subject: `New Contact Form Submission from ${name}`, // Subject line
+    const { data, error } = await resend.emails.send({
+      from: `${name} <onboarding@resend.dev>`, // Resend requires verified domain, use their test domain for now
+      reply_to: email,
+      to: [process.env.ADMIN_EMAIL],
+      subject: `New Contact Form Submission from ${name}`,
       html: `
         <h3>New Contact Request</h3>
         <p><strong>Name:</strong> ${name}</p>
@@ -507,20 +473,27 @@ app.post('/api/contact', handleAsync(async (req, res) => {
         <p><strong>Message:</strong></p>
         <p>${message}</p>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', info.messageId);
-    res.json({ message: 'Email sent successfully', messageId: info.messageId });
+    if (error) {
+      console.error('❌ Error sending email:', error);
+      return res.status(500).json({
+        error: 'Failed to send email',
+        details: error.message
+      });
+    }
+
+    console.log('✅ Email sent successfully:', data.id);
+    res.json({ message: 'Email sent successfully', messageId: data.id });
   } catch (error) {
     console.error('❌ Error sending email:', error);
     res.status(500).json({
       error: 'Failed to send email',
-      details: error.message,
-      code: error.code
+      details: error.message
     });
   }
 }));
+
 
 // Career Application Endpoint
 app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, res) => {
@@ -533,8 +506,8 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
     }
 
     // Check if email is configured
-    if (!transporter) {
-      console.warn('⚠️  Application received but email not sent: SMTP not configured');
+    if (!resend) {
+      console.warn('⚠️  Application received but email not sent: Resend not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Application received but email could not be sent. Please contact the administrator.'
@@ -543,10 +516,14 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     console.log('Attempting to send job application email from:', email);
 
-    const mailOptions = {
-      from: `"${name}" <${process.env.SMTP_USER}>`,
-      replyTo: email,
-      to: process.env.ADMIN_EMAIL,
+    // Read the file as base64 for Resend
+    const fileBuffer = fs.readFileSync(resumeFile.path);
+    const fileBase64 = fileBuffer.toString('base64');
+
+    const { data, error } = await resend.emails.send({
+      from: `${name} <onboarding@resend.dev>`,
+      reply_to: email,
+      to: [process.env.ADMIN_EMAIL],
       subject: `New Job Application: ${jobTitle} - ${name}`,
       html: `
         <h3>New Job Application</h3>
@@ -558,24 +535,30 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
       attachments: [
         {
           filename: resumeFile.originalname,
-          path: resumeFile.path,
+          content: fileBase64,
         },
       ],
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Job application email sent successfully:', info.messageId);
+    if (error) {
+      console.error('❌ Error sending job application email:', error);
+      return res.status(500).json({
+        error: 'Failed to submit application',
+        details: error.message
+      });
+    }
+
+    console.log('✅ Job application email sent successfully:', data.id);
 
     // Clean up uploaded resume after sending? 
     // Maybe keep it for record. For now, we leave it in uploads.
 
-    res.json({ message: 'Application submitted successfully', messageId: info.messageId });
+    res.json({ message: 'Application submitted successfully', messageId: data.id });
   } catch (error) {
     console.error('❌ Error sending job application email:', error);
     res.status(500).json({
       error: 'Failed to submit application',
-      details: error.message,
-      code: error.code
+      details: error.message
     });
   }
 }));
