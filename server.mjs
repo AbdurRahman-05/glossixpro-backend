@@ -9,6 +9,10 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import PageContent from './models/PageContent.js';
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Force IPv4
+dns.setDefaultResultOrder('ipv4first');
 
 // Load environment variables
 dotenv.config();
@@ -442,9 +446,10 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       pass: process.env.SMTP_PASS,
     },
     // Add timeout settings to prevent hanging
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+    family: 4, // Force IPv4
     logger: true, // Log to console
     debug: true, // include SMTP traffic in the logs
   });
