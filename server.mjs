@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import PageContent from './models/PageContent.js';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 // Load environment variables
 dotenv.config();
@@ -429,15 +429,20 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 
-// Initialize Resend
-let resend = null;
+// Initialize Nodemailer
+let transporter = null;
 
-if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-  console.log('✅ Resend email service initialized');
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+  console.log('✅ Nodemailer initialized with Gmail');
 } else {
-  console.warn('⚠️  RESEND_API_KEY not configured. Email functionality will be disabled.');
-  console.warn('💡 Set RESEND_API_KEY environment variable to enable emails.');
+  console.warn('⚠️  EMAIL_USER or EMAIL_PASS not configured. Email functionality will be disabled.');
 }
 
 
@@ -447,8 +452,8 @@ app.post('/api/contact', handleAsync(async (req, res) => {
     const { name, email, businessName, phoneNumber, howCanWeHelp, bestTimeToContact, message } = req.body;
 
     // Check if email is configured
-    if (!resend) {
-      console.warn('⚠️  Email not sent: Resend not configured');
+    if (!transporter) {
+      console.warn('⚠️  Email not sent: Nodemailer not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Contact form submission received but email could not be sent. Please contact the administrator.'
@@ -457,10 +462,10 @@ app.post('/api/contact', handleAsync(async (req, res) => {
 
     console.log('Attempting to send email from:', email);
 
-    const { data, error } = await resend.emails.send({
-      from: `${name} <onboarding@resend.dev>`, // Resend requires verified domain, use their test domain for now
-      reply_to: email,
-      to: [process.env.ADMIN_EMAIL],
+    const mailOptions = {
+      from: `"${name}" <${process.env.EMAIL_USER}>`, // Sender address
+      replyTo: email, // Reply to the user's email
+      to: 'info.glossixpro@gmail.com', // Receiver
       subject: `New Contact Form Submission from ${name}`,
       html: `
         <h3>New Contact Request</h3>
@@ -473,18 +478,12 @@ app.post('/api/contact', handleAsync(async (req, res) => {
         <p><strong>Message:</strong></p>
         <p>${message}</p>
       `,
-    });
+    };
 
-    if (error) {
-      console.error('❌ Error sending email:', error);
-      return res.status(500).json({
-        error: 'Failed to send email',
-        details: error.message
-      });
-    }
+    const info = await transporter.sendMail(mailOptions);
 
-    console.log('✅ Email sent successfully:', data.id);
-    res.json({ message: 'Email sent successfully', messageId: data.id });
+    console.log('✅ Email sent successfully:', info.messageId);
+    res.json({ message: 'Email sent successfully', messageId: info.messageId });
   } catch (error) {
     console.error('❌ Error sending email:', error);
     res.status(500).json({
@@ -506,8 +505,8 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
     }
 
     // Check if email is configured
-    if (!resend) {
-      console.warn('⚠️  Application received but email not sent: Resend not configured');
+    if (!transporter) {
+      console.warn('⚠️  Application received but email not sent: Nodemailer not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Application received but email could not be sent. Please contact the administrator.'
@@ -516,14 +515,10 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     console.log('Attempting to send job application email from:', email);
 
-    // Read the file as base64 for Resend
-    const fileBuffer = fs.readFileSync(resumeFile.path);
-    const fileBase64 = fileBuffer.toString('base64');
-
-    const { data, error } = await resend.emails.send({
-      from: `${name} <onboarding@resend.dev>`,
-      reply_to: email,
-      to: [process.env.ADMIN_EMAIL],
+    const mailOptions = {
+      from: `"${name}" <${process.env.EMAIL_USER}>`,
+      replyTo: email,
+      to: 'jobs.glossixpro@gmail.com',
       subject: `New Job Application: ${jobTitle} - ${name}`,
       html: `
         <h3>New Job Application</h3>
@@ -535,25 +530,19 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
       attachments: [
         {
           filename: resumeFile.originalname,
-          content: fileBase64,
+          path: resumeFile.path
         },
       ],
-    });
+    };
 
-    if (error) {
-      console.error('❌ Error sending job application email:', error);
-      return res.status(500).json({
-        error: 'Failed to submit application',
-        details: error.message
-      });
-    }
+    const info = await transporter.sendMail(mailOptions);
 
-    console.log('✅ Job application email sent successfully:', data.id);
+    console.log('✅ Job application email sent successfully:', info.messageId);
 
     // Clean up uploaded resume after sending? 
     // Maybe keep it for record. For now, we leave it in uploads.
 
-    res.json({ message: 'Application submitted successfully', messageId: data.id });
+    res.json({ message: 'Application submitted successfully', messageId: info.messageId });
   } catch (error) {
     console.error('❌ Error sending job application email:', error);
     res.status(500).json({
