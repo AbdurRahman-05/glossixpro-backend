@@ -467,7 +467,7 @@ app.post('/api/contact', handleAsync(async (req, res) => {
     const { data, error } = await resendContact.emails.send({
       from: 'Glossix Pro <onboarding@resend.dev>',
       replyTo: email,
-      to: 'glossixpro.web@gmail.com', // Changed to registered Resend email for testing
+      to: 'info.glossixpro@gmail.com', // Matches RESEND_API_KEY_CONTACT registration
       subject: `New Contact Form Submission from ${name}`,
       html: `
         <h3>New Contact Request</h3>
@@ -531,7 +531,7 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
     const { data, error } = await resendJobs.emails.send({
       from: 'Glossix Pro <onboarding@resend.dev>',
       replyTo: email,
-      to: 'glossixpro.web@gmail.com', // Changed to registered Resend email for testing
+      to: 'jobs.glossixpro@gmail.com', // Matches RESEND_API_KEY_JOBS registration
       subject: `New Job Application: ${jobTitle} - ${name}`,
       html: `
         <h3>New Job Application</h3>
