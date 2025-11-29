@@ -429,14 +429,22 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 
-// Initialize Resend
-let resend = null;
+// Initialize Resend instances
+let resendContact = null;
+let resendJobs = null;
 
-if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-  console.log('✅ Resend initialized');
+if (process.env.RESEND_API_KEY_CONTACT) {
+  resendContact = new Resend(process.env.RESEND_API_KEY_CONTACT);
+  console.log('✅ Resend (Contact) initialized');
 } else {
-  console.warn('⚠️  RESEND_API_KEY not configured. Email functionality will be disabled.');
+  console.warn('⚠️  RESEND_API_KEY_CONTACT not configured. Contact form emails will be disabled.');
+}
+
+if (process.env.RESEND_API_KEY_JOBS) {
+  resendJobs = new Resend(process.env.RESEND_API_KEY_JOBS);
+  console.log('✅ Resend (Jobs) initialized');
+} else {
+  console.warn('⚠️  RESEND_API_KEY_JOBS not configured. Job application emails will be disabled.');
 }
 
 
@@ -446,8 +454,8 @@ app.post('/api/contact', handleAsync(async (req, res) => {
     const { name, email, businessName, phoneNumber, howCanWeHelp, bestTimeToContact, message } = req.body;
 
     // Check if email is configured
-    if (!resend) {
-      console.warn('⚠️  Email not sent: Resend not configured');
+    if (!resendContact) {
+      console.warn('⚠️  Email not sent: Resend (Contact) not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Contact form submission received but email could not be sent. Please contact the administrator.'
@@ -456,7 +464,7 @@ app.post('/api/contact', handleAsync(async (req, res) => {
 
     console.log('Attempting to send email from:', email);
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendContact.emails.send({
       from: 'Glossix Pro <onboarding@resend.dev>',
       replyTo: email,
       to: 'glossixpro.web@gmail.com', // Changed to registered Resend email for testing
@@ -506,8 +514,8 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
     }
 
     // Check if email is configured
-    if (!resend) {
-      console.warn('⚠️  Application received but email not sent: Resend not configured');
+    if (!resendJobs) {
+      console.warn('⚠️  Application received but email not sent: Resend (Jobs) not configured');
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'Application received but email could not be sent. Please contact the administrator.'
@@ -520,7 +528,7 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
     const resumeBuffer = fs.readFileSync(resumeFile.path);
     const resumeBase64 = resumeBuffer.toString('base64');
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendJobs.emails.send({
       from: 'Glossix Pro <onboarding@resend.dev>',
       replyTo: email,
       to: 'glossixpro.web@gmail.com', // Changed to registered Resend email for testing
