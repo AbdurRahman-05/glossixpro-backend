@@ -33,9 +33,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(uploadsDir));
 
 // MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mnabdurrahman05_db_user:NCYHAmzNBGTYsehY@cluster0.k6tqby7.mongodb.net/';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://glossixproweb_db_user:gMgocUEhZ5VonPv5@cluster0.8f39li6.mongodb.net/?appName=Cluster0';
 
-if (!process.env.MONGO_URI || MONGO_URI === 'mongodb+srv://mnabdurrahman05_db_user:NCYHAmzNBGTYsehY@cluster0.k6tqby7.mongodb.net/') {
+if (!process.env.MONGO_URI || MONGO_URI === 'mongodb+srv://glossixproweb_db_user:gMgocUEhZ5VonPv5@cluster0.8f39li6.mongodb.net/?appName=Cluster0') {
   console.warn('⚠️  WARNING: MONGO_URI not set in .env file. Using default local MongoDB connection.');
   console.warn('⚠️  Please create a .env file with your MongoDB connection string.');
 }

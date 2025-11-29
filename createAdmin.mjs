@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mnabdurrahman05_db_user:NCYHAmzNBGTYsehY@cluster0.k6tqby7.mongodb.net/glossixpro';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://glossixproweb_db_user:gMgocUEhZ5VonPv5@cluster0.8f39li6.mongodb.net/?appName=Cluster0';
 
 // User Schema (same as in server.mjs)
 const UserSchema = new mongoose.Schema({
