@@ -374,6 +374,8 @@ if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !pr
 // File Upload with Cloudinary
 // Use multer memory storage to handle file in memory before uploading to Cloudinary
 const storage = multer.memoryStorage();
+
+// Multer configuration for IMAGE uploads (for gallery)
 const upload = multer({
   storage,
   limits: {
@@ -383,6 +385,28 @@ const upload = multer({
     // Accept images only
     if (!file.mimetype.startsWith('image/')) {
       cb(new Error('Only image files are allowed'));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
+// Multer configuration for RESUME uploads (for job applications)
+const uploadResume = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit for resumes
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept PDF, DOC, DOCX files only
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      cb(new Error('Only PDF, DOC, and DOCX files are allowed for resumes'));
       return;
     }
     cb(null, true);
@@ -517,7 +541,7 @@ app.post('/api/contact', handleAsync(async (req, res) => {
 
 
 // Career Application Endpoint
-app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, res) => {
+app.post('/api/career/apply', uploadResume.single('resume'), handleAsync(async (req, res) => {
   try {
     const { name, email, phone, jobTitle } = req.body;
     const resumeFile = req.file;
@@ -562,6 +586,8 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     if (error) {
       console.error('❌ Error sending job application email:', JSON.stringify(error, null, 2));
+      console.error('❌ Error details - Name:', error.name);
+      console.error('❌ Error details - Message:', error.message);
       return res.status(500).json({
         error: 'Failed to submit application',
         details: error.message,
@@ -576,7 +602,10 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     res.json({ message: 'Application submitted successfully', messageId: data.id });
   } catch (error) {
-    console.error('❌ Error sending job application email:', error);
+    console.error('❌ Caught exception in job application handler:');
+    console.error('❌ Error type:', error.constructor.name);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       error: 'Failed to submit application',
       details: error.message
