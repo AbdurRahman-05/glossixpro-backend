@@ -537,9 +537,8 @@ app.post('/api/career/apply', upload.single('resume'), handleAsync(async (req, r
 
     console.log('Attempting to send job application email from:', email);
 
-    // Read the resume file as base64
-    const resumeBuffer = fs.readFileSync(resumeFile.path);
-    const resumeBase64 = resumeBuffer.toString('base64');
+    // Convert the resume buffer to base64 (file is in memory, not on disk)
+    const resumeBase64 = resumeFile.buffer.toString('base64');
 
     const { data, error } = await resendJobs.emails.send({
       from: 'Glossix Pro <onboarding@resend.dev>',
