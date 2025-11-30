@@ -7,33 +7,7 @@ dotenv.config();
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://glossixproweb_db_user:gMgocUEhZ5VonPv5@cluster0.8f39li6.mongodb.net/?appName=Cluster0';
 
-// User Schema (same as in server.mjs)
-const UserSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
-  },
-}, {
-  timestamps: true
-});
-
-// Hash password before saving
-UserSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-const User = mongoose.model('User', UserSchema);
+import User from './models/User.js';
 
 async function createAdmin() {
   try {

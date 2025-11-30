@@ -5,20 +5,8 @@ dotenv.config();
 
 const MONGO_URI = process.env.MONGO_URI;
 
-// Schemas (copied from server.mjs)
-const JobSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    location: { type: String, required: true },
-    description: { type: String, required: true },
-}, { timestamps: true });
-const Job = mongoose.model('Job', JobSchema);
-
-const ImageSchema = new mongoose.Schema({
-    category: { type: String, required: true, enum: ['home', 'about', 'general'] },
-    src: { type: String, required: true },
-    alt: { type: String, default: '' },
-}, { timestamps: true });
-const Image = mongoose.model('Image', ImageSchema);
+import Job from './models/Job.js';
+import Image from './models/Image.js';
 
 const sampleJobs = [
     {
