@@ -7,8 +7,14 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
-import PageContent from './models/PageContent.js';
 import { Resend } from 'resend';
+
+// Models
+import PageContent from './models/PageContent.js';
+import Job from './models/Job.js';
+import Image from './models/Image.js';
+import Service from './models/Service.js';
+import User from './models/User.js';
 
 // Load environment variables
 dotenv.config();
@@ -66,60 +72,6 @@ process.on('SIGINT', async () => {
   console.log('MongoDB connection closed through app termination');
   process.exit(0);
 });
-
-// Mongoose Schemas
-const JobSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  location: { type: String, required: true },
-  description: { type: String, required: true },
-}, {
-  timestamps: true
-});
-const Job = mongoose.model('Job', JobSchema);
-
-const ImageSchema = new mongoose.Schema({
-  category: { type: String, required: true, enum: ['home', 'about', 'general'] },
-  src: { type: String, required: true },
-  alt: { type: String, default: '' },
-}, {
-  timestamps: true
-});
-const Image = mongoose.model('Image', ImageSchema);
-
-const ServiceSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-}, {
-  timestamps: true
-});
-const Service = mongoose.model('Service', ServiceSchema);
-
-const UserSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
-  },
-}, {
-  timestamps: true
-});
-
-// Hash password before saving
-UserSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-const User = mongoose.model('User', UserSchema);
 
 // Error handling middleware
 const handleAsync = (fn) => {
