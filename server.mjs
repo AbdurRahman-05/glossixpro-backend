@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import { Resend } from 'resend';
+import { v2 as cloudinary } from 'cloudinary';
 
 // Models
 import PageContent from './models/PageContent.js';
@@ -355,30 +356,90 @@ app.post('/api/register', handleAsync(async (req, res) => {
   });
 }));
 
-// File Upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'public', 'uploads'));
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Check Cloudinary configuration
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('⚠️  WARNING: Cloudinary credentials not set in .env file.');
+  console.warn('⚠️  Image uploads will fail. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to .env');
+} else {
+  console.log('✅ Cloudinary configured successfully');
+}
+
+// File Upload with Cloudinary
+// Use multer memory storage to handle file in memory before uploading to Cloudinary
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
   },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only image files are allowed'));
+      return;
+    }
+    cb(null, true);
   }
 });
 
-const upload = multer({ storage });
+app.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-app.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+      return res.status(503).json({
+        error: 'Image upload service not configured',
+        message: 'Please contact administrator to configure Cloudinary'
+      });
+    }
+
+    // Upload to Cloudinary using upload_stream
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'glossixpro/gallery', // Organize images in a folder
+          resource_type: 'auto',
+          transformation: [
+            { quality: 'auto:good' }, // Automatic quality optimization
+            { fetch_format: 'auto' }  // Automatic format selection (WebP when supported)
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      // Pipe the buffer to Cloudinary
+      uploadStream.end(req.file.buffer);
+    });
+
+    const result = await uploadPromise;
+
+    res.json({
+      url: result.secure_url, // HTTPS URL from Cloudinary
+      filename: result.public_id,
+      category: req.body.category || 'general'
+    });
+  } catch (error) {
+    console.error('❌ Error uploading to Cloudinary:', error);
+    res.status(500).json({
+      error: 'Failed to upload image',
+      details: error.message
+    });
   }
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({
-    url: fileUrl,
-    filename: req.file.filename,
-    category: req.body.category || 'general'
-  });
 });
+
 
 
 // Initialize Resend instances
