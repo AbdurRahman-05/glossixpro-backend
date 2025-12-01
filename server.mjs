@@ -16,6 +16,7 @@ import Job from './models/Job.js';
 import Image from './models/Image.js';
 import Service from './models/Service.js';
 import User from './models/User.js';
+import TeamMember from './models/TeamMember.js';
 
 // Load environment variables
 dotenv.config();
@@ -267,6 +268,62 @@ app.delete('/api/services/:id', handleAsync(async (req, res) => {
   }
 
   res.json({ message: 'Service deleted successfully', id });
+}));
+
+// Team Members
+app.get('/api/team', handleAsync(async (req, res) => {
+  const team = await TeamMember.find().sort({ order: 1, createdAt: 1 });
+  res.json(team);
+}));
+
+app.post('/api/team', handleAsync(async (req, res) => {
+  const { name, role, bio, image, order } = req.body;
+
+  if (!name || !role || !bio) {
+    return res.status(400).json({
+      error: 'Missing required fields: name, role, and bio are required'
+    });
+  }
+
+  const newMember = new TeamMember({ name, role, bio, image, order });
+  await newMember.save();
+  res.status(201).json(newMember);
+}));
+
+app.put('/api/team/:id', handleAsync(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid team member ID format' });
+  }
+
+  const updatedMember = await TeamMember.findByIdAndUpdate(
+    id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedMember) {
+    return res.status(404).json({ error: 'Team member not found' });
+  }
+
+  res.json(updatedMember);
+}));
+
+app.delete('/api/team/:id', handleAsync(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: 'Invalid team member ID format' });
+  }
+
+  const deletedMember = await TeamMember.findByIdAndDelete(id);
+
+  if (!deletedMember) {
+    return res.status(404).json({ error: 'Team member not found' });
+  }
+
+  res.json({ message: 'Team member deleted successfully', id });
 }));
 
 // Page Content
